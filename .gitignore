@@ -1,0 +1,28 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# Environment variables (secrets)
+.env
+.env.local
+
+# Temporary files
+*.tmp
+chat_id.txt
+client-calendar-id.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+token.pickle
