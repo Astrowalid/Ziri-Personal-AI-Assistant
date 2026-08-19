@@ -10,10 +10,7 @@ This project is unrelated to any other project (e.g. WhatsApp business tools).
 Do not reference or reuse patterns, personas, or pricing logic from other projects.
 
 ## Current status
-**Shipped: v1** — see `docs/versions/v1.md` for full spec, final scope, and
-how to run/test it.
-**Building: v2**
-**Blocking v3:** v2 not done yet.
+Shipped: v1 (confirm actual ship date with me). Building: v2.
 
 Update this section as versions ship. When a version ships:
 1. Write `docs/versions/vX.md` capturing what actually shipped (final scope,
@@ -61,21 +58,43 @@ Update this section as versions ship. When a version ships:
 
 ## Commands
 
-⚠️ UNRESOLVED — fill in once confirmed:
-- Run locally: `TBD`
-- Run tests: `TBD`
-- Trigger a check-in manually (for testing without waiting for the
-  scheduled time): `TBD`
+- Run locally:
+  - Telegram bot: `python bot.py`
+  - Scheduler: `python scheduler.py`
+- Run tests / verify components:
+  - Verify Calendar tools: `python calendar_tool.py`
+  - Verify Agent logic: `python assistant_agent.py`
+- Trigger a check-in manually: `python daily_checkin.py`
 
 ## Version roadmap
 
 ### v1 — Prove the loop
 Shipped. See `docs/versions/v1.md` for full spec and details.
 
-### v2 — Add coursework awareness (CURRENT)
-Google Classroom API as a second tool. Check-ins reference real due dates.
-Still session-only memory.
-Done = it can say "assignment due in 2 days, nothing blocked for it" unprompted.
+### v2 — Add coursework awareness
+Google Classroom API as a second, separate tool (read-only). Classroom
+and Calendar remain independent data sources — no writing Classroom data
+into Calendar, no merging them into one event system.
+Still session-only memory (no persistence of status across days — that's v3).
+
+Done when:
+- Daily check-in includes a Classroom section alongside the Calendar
+  section, showing real assignments with real submission status
+  (submitted / not submitted), pulled live each time — not cached,
+  not remembered from a prior check-in
+- User can ask the agent about Classroom directly in natural language
+  (e.g. "what's due this week", "did I submit the lab report") and get
+  an answer pulled live from the Classroom API
+- Calendar tool and Calendar behavior from v1 are unchanged
+
+Explicitly OUT of scope for v2:
+- Writing Classroom assignments into Calendar as events (not needed —
+  due dates already auto-sync via the academic Workspace account into
+  Calendar separately from this project's Calendar tool)
+- Any status field, "done/working on/not done" tracking, or persistence
+  across days/runs (v3 — this is long-term memory, not a v2 concern)
+- Merging Classroom and Calendar into a single data model
+
 
 ### v3 — Long-term memory
 Persist planned-vs-done across days. Check-ins become "did you do X," not
@@ -126,18 +145,8 @@ first time anything runs unattended (v1 already needs *some* scheduler).
 
 ## Tech stack
 - **Framework:** Google Agent Development Kit (ADK)
-- **Model:** Gemini API (model choice TBD — confirm current recommended
-  model/tier before hardcoding one; free-tier quotas change)
+- **Model:** `gemini-3.5-flash-lite` (via Gemini API)
 - **Bot interface:** Telegram Bot API
 - **Calendar:** Google Calendar API (OAuth)
 - **Trigger (v1):** local cron job or simple scheduler — not a managed
   always-on service yet
-
-## Open items / decisions not yet made
-- Exact check-in send time
-- Which Gemini model/tier to use (needs a current quota check, not an
-  assumption)
-- Whether Calendar tool functions are hand-written or pulled from an
-  existing MCP server (either is fine for v1 — don't let "let's do this via
-  MCP properly" turn into a Day 2b detour if hand-writing two functions is
-  faster)
