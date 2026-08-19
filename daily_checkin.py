@@ -1,6 +1,12 @@
 import os
 import sys
 import asyncio
+# Reconfigure stdout/stderr to support unicode/emojis on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 import dotenv
 from telegram import Bot
 from assistant_agent import run_agent_turn
@@ -30,9 +36,17 @@ async def main() -> None:
     # 2. Ask the ADK Agent to generate the daily check-in
     prompt = (
         "Generate a friendly daily check-in message. "
-        "List all of today's calendar events in detail (or state if there are none scheduled). "
-        "Keep it concise and end by asking the user for their top priorities today."
+        "Format the check-in as two clearly labeled sections, Calendar first, then Classroom as a new section below it:\n\n"
+        "📅 Calendar\n"
+        "[List all of today's calendar events in detail, or state if there are none scheduled]\n\n"
+        "📚 Classroom\n"
+        "[List the pending (Not submitted) coursework assignments fetched from Classroom using this exact format:\n"
+        "- [Course]: [Assignment] — due [date] — [Submitted / Not submitted]\n"
+        "If there are no pending/unsubmitted assignments, write 'No pending assignments']\n\n"
+        "Ensure there is a blank line between the Calendar and Classroom sections, keeping them visually distinct so Classroom items are never interleaved into the Calendar list or mistaken for calendar events. "
+        "End by asking the user for their top priorities today."
     )
+
     
     checkin_text = await asyncio.to_thread(
         run_agent_turn,

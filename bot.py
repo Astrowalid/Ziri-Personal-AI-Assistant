@@ -1,5 +1,12 @@
 import os
+import sys
 import asyncio
+# Reconfigure stdout/stderr to support unicode/emojis on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 import dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
@@ -24,9 +31,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     welcome_text = (
         f"Hi {update.effective_user.first_name}! I am Ziri, your Personal Assistant Agent.\n\n"
-        "I have access to your Google Calendar. You can ask me:\n"
+        "I have access to your Google Calendar and Google Classroom. You can ask me:\n"
         "• 'What do I have scheduled for today?'\n"
-        "• 'Add dentist at 3pm tomorrow'\n\n"
+        "• 'Add dentist at 3pm tomorrow'\n"
+        "• 'What assignments do I have for my ML class?'\n\n"
         "How can I help you today?"
     )
     await update.message.reply_text(welcome_text)

@@ -1,4 +1,11 @@
 import os
+import sys
+# Reconfigure stdout/stderr to support unicode/emojis on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 import dotenv
 from datetime import datetime
 from google.genai import types
@@ -6,6 +13,7 @@ from google.adk.agents import Agent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from calendar_tool import list_events, create_calendar_event, find_calendar_events, update_calendar_event
+from classroom_tool import list_classroom_assignments
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -26,20 +34,22 @@ assistant_agent = Agent(
     name="Ziri",
     model="gemini-3.5-flash-lite",
     instruction=(
-        "You are Ziri, the user's personal assistant. You have access to the user's Google Calendar. "
-        "You can list calendar events for any timeframe (e.g. today, this week, a particular month), find/search for events, create new events, and update existing events. "
-        "To resolve relative or custom timeframes (both past and future, such as 'yesterday', 'last week', 'today', 'this week', 'next Monday', 'September', etc.), "
-        "you MUST first call `get_current_time` to check the current date and time, then use `list_events` with the calculated start and end ISO timestamps.\n\n"
-        "Operations:\n"
-        "1. Create Event: Convert the requested event time into an exact ISO format string "
-        "(including the timezone offset) and call `create_calendar_event`.\n"
-        "2. Update/Edit Event: If the user asks you to edit, change, reschedule, or add descriptions/notes to an existing event, "
+        "You are Ziri, the user's personal assistant. You have access to the user's Google Calendar and Google Classroom.\n\n"
+        "Google Calendar Operations:\n"
+        "1. You can list calendar events for any timeframe (e.g. today, this week, a particular month), find/search for events, create new events, and update existing events.\n"
+        "2. To resolve relative or custom timeframes (both past and future, such as 'yesterday', 'last week', 'today', 'this week', 'next Monday', 'September', etc.), "
+        "you MUST first call `get_current_time` to check the current date and time, then use `list_events` with the calculated start and end ISO timestamps.\n"
+        "3. Create Event: Convert the requested event time into an exact ISO format string (including the timezone offset) and call `create_calendar_event`.\n"
+        "4. Update/Edit Event: If the user asks you to edit, change, reschedule, or add descriptions/notes to an existing event, "
         "you must first use `find_calendar_events` with a search query (e.g. the name of the event) to locate the event and get its ID. "
         "Once you have the event ID, use `update_calendar_event` to apply the changes (such as adding/modifying the description, "
         "changing the summary, or rescheduling the time). Always use the exact ISO time format for updates.\n\n"
-        "Always confirm back to the user with a friendly, concise message when you add, find, or update events."
+        "Google Classroom Operations:\n"
+        "1. You can fetch/list assignments (coursework) and their submission status (whether the user has turned them in or not) from Google Classroom using `list_classroom_assignments`.\n"
+        "2. When answering queries about assignments or coursework, you must explicitly identify the items as coming 'from Classroom' rather than listing them bare or mixing them with Calendar events.\n\n"
+        "Always confirm back to the user with a friendly, concise message when you run operations."
     ),
-    tools=[get_current_time, list_events, create_calendar_event, find_calendar_events, update_calendar_event]
+    tools=[get_current_time, list_events, create_calendar_event, find_calendar_events, update_calendar_event, list_classroom_assignments]
 )
 
 # Initialize the Runner with InMemorySessionService
@@ -87,3 +97,8 @@ if __name__ == '__main__':
     # Test 2: Add an event
     print("\n--- Test 2: Adding an event ---")
     run_agent_turn("schedule dentist at 3pm tomorrow")
+
+    # Test 3: Ask about Classroom assignments
+    print("\n--- Test 3: Asking about coursework ---")
+    run_agent_turn("what assignments do I have for my ML course and did I submit them?")
+
