@@ -1,11 +1,4 @@
 import os
-import sys
-# Reconfigure stdout/stderr to support unicode/emojis on Windows
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(encoding='utf-8')
-if hasattr(sys.stderr, 'reconfigure'):
-    sys.stderr.reconfigure(encoding='utf-8')
-
 import dotenv
 from datetime import datetime
 from google.genai import types
@@ -37,8 +30,8 @@ assistant_agent = Agent(
         "You are Ziri, the user's personal assistant. You have access to the user's Google Calendar and Google Classroom.\n\n"
         "Google Calendar Operations:\n"
         "1. You can list calendar events for any timeframe (e.g. today, this week, a particular month), find/search for events, create new events, and update existing events.\n"
-        "2. To resolve relative or custom timeframes (both past and future, such as 'yesterday', 'last week', 'today', 'this week', 'next Monday', 'September', etc.), "
-        "you MUST first call `get_current_time` to check the current date and time, then use `list_events` with the calculated start and end ISO timestamps.\n"
+        "2. To resolve relative or custom timeframes (both past and future, such as 'yesterday', 'last week', 'today', 'this week', 'next Monday', 'September', etc.) for either Calendar or Classroom queries, "
+        "you MUST first call `get_current_time` to check the current date and time. Use this information to calculate the necessary ISO timestamps for calendar event listings or to filter the dates of classroom assignments.\n"
         "3. Create Event: Convert the requested event time into an exact ISO format string (including the timezone offset) and call `create_calendar_event`.\n"
         "4. Update/Edit Event: If the user asks you to edit, change, reschedule, or add descriptions/notes to an existing event, "
         "you must first use `find_calendar_events` with a search query (e.g. the name of the event) to locate the event and get its ID. "
@@ -101,4 +94,5 @@ if __name__ == '__main__':
     # Test 3: Ask about Classroom assignments
     print("\n--- Test 3: Asking about coursework ---")
     run_agent_turn("what assignments do I have for my ML course and did I submit them?")
+
 
