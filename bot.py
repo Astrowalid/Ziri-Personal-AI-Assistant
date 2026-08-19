@@ -19,15 +19,15 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN is missing in the environment or .env file.")
 
-def save_chat_id(chat_id: str) -> None:
-    """Saves the user's chat ID to a file so the daily check-in scheduler can read it."""
-    with open("chat_id.txt", "w") as f:
-        f.write(chat_id)
+TELEGRAM_ALLOWED_CHAT_ID = os.getenv("TELEGRAM_ALLOWED_CHAT_ID")
+if not TELEGRAM_ALLOWED_CHAT_ID:
+    raise ValueError("TELEGRAM_ALLOWED_CHAT_ID is missing in the environment or .env file.")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a welcome message when the command /start is issued."""
     chat_id = str(update.effective_chat.id)
-    save_chat_id(chat_id)
+    if chat_id != TELEGRAM_ALLOWED_CHAT_ID:
+        return
     
     welcome_text = (
         f"Hi {update.effective_user.first_name}! I am Ziri, your Personal Assistant Agent.\n\n"
@@ -41,15 +41,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Pass user messages to the ADK agent and reply with the agent's response."""
+    chat_id = str(update.effective_chat.id)
+    if chat_id != TELEGRAM_ALLOWED_CHAT_ID:
+        return
+
     user_message = update.message.text
     if not user_message:
         return
         
-    chat_id = str(update.effective_chat.id)
     user_id = str(update.effective_user.id)
-    
-    # Save the chat ID for scheduled triggers
-    save_chat_id(chat_id)
     
     # Show typing status to let the user know the bot is thinking
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")

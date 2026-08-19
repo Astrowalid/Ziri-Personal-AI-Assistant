@@ -19,16 +19,10 @@ if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN is missing in the environment or .env file.")
 
 async def main() -> None:
-    # 1. Check if chat_id.txt exists
-    if not os.path.exists("chat_id.txt"):
-        print("Error: No chat ID saved. Please send a message or /start to the Telegram bot first.")
-        sys.exit(1)
-        
-    with open("chat_id.txt", "r") as f:
-        chat_id = f.read().strip()
-        
+    # 1. Retrieve the allowed chat ID from environment variables
+    chat_id = os.getenv("TELEGRAM_ALLOWED_CHAT_ID")
     if not chat_id:
-        print("Error: Saved chat ID is empty.")
+        print("Error: TELEGRAM_ALLOWED_CHAT_ID is missing in the environment or .env file.")
         sys.exit(1)
         
     print(f"Triggering daily check-in for Chat ID: {chat_id}...")
