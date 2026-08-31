@@ -10,7 +10,7 @@ This project is unrelated to any other project (e.g. WhatsApp business tools).
 Do not reference or reuse patterns, personas, or pricing logic from other projects.
 
 ## Current status
-Shipped: v1 (confirm actual ship date with me). Building: v2.
+Shipped: v1, v2 (confirm actual v2 ship date with me). Building: v3.
 
 Update this section as versions ship. When a version ships:
 1. Write `docs/versions/vX.md` capturing what actually shipped (final scope,
@@ -18,6 +18,13 @@ Update this section as versions ship. When a version ships:
 2. Trim that version's detailed spec out of the roadmap below, replacing it
    with a one-line pointer, e.g. `v1 — shipped 2026-08-20. See docs/versions/v1.md`.
 3. Update this section.
+
+### Security hardening (Post-v2)
+Post-v2 hardening: `bot.py` and `daily_checkin.py` now verify incoming Telegram chat_id against `TELEGRAM_ALLOWED_CHAT_ID` (from `.env`) before processing any message — unauthorized senders are silently ignored. `chat_id.txt` removed.
+
+Also flagged, not yet fixed:
+- OAuth tokens stored as plaintext pickle files (should move to JSON).
+- PII (event/assignment details) logged to stdout.
 
 ## Boundaries
 
@@ -69,39 +76,34 @@ Update this section as versions ship. When a version ships:
 ## Version roadmap
 
 ### v1 — Prove the loop
-Shipped. See `docs/versions/v1.md` for full spec and details.
+Shipped. See [v1.md](file:///C:/Users/user/Documents/Cool%20Projects/Personal-AI-Assistant/docs/versions/v1.md) for full spec and details.
 
 ### v2 — Add coursework awareness
-Google Classroom API as a second, separate tool (read-only). Classroom
-and Calendar remain independent data sources — no writing Classroom data
-into Calendar, no merging them into one event system.
-Still session-only memory (no persistence of status across days — that's v3).
-
-Done when:
-- Daily check-in includes a Classroom section alongside the Calendar
-  section, showing real assignments with real submission status
-  (submitted / not submitted), pulled live each time — not cached,
-  not remembered from a prior check-in
-- User can ask the agent about Classroom directly in natural language
-  (e.g. "what's due this week", "did I submit the lab report") and get
-  an answer pulled live from the Classroom API
-- Calendar tool and Calendar behavior from v1 are unchanged
-
-Explicitly OUT of scope for v2:
-- Writing Classroom assignments into Calendar as events (not needed —
-  due dates already auto-sync via the academic Workspace account into
-  Calendar separately from this project's Calendar tool)
-- Any status field, "done/working on/not done" tracking, or persistence
-  across days/runs (v3 — this is long-term memory, not a v2 concern)
-- Merging Classroom and Calendar into a single data model
-
+Shipped (confirm actual v2 ship date with me). See [v2.md](file:///C:/Users/user/Documents/Cool%20Projects/Personal-AI-Assistant/docs/versions/v2.md).
 
 ### v3 — Long-term memory
-Persist planned-vs-done across days. Check-ins become "did you do X," not
-just "here's what's due." First real dependency on ADK's Session/Memory
-concepts — the point where it stops being a notifier and becomes an
-assistant with a track record.
-Done = it can accurately answer "what did I finish this week?"
+Persist planned-vs-done across days. Check-ins become "did you do X,"
+not just "here's what's due." First real dependency on ADK's
+Session/Memory concepts (Day 3a/3b) — the point where it stops being a
+notifier and becomes an assistant with a track record.
+
+Done when:
+- Agent can accurately answer "what did I finish this week?" using
+  real persisted data, not live recomputation from Calendar/Classroom
+  APIs each time
+- Status (done / not done / in progress — exact states TBD) is stored
+  persistently across bot restarts, not just within one session
+- Daily check-ins can reference yesterday's/this week's actual
+  completion history, not just today's live Calendar+Classroom state
+- Tested across at least 7 real days showing accurate memory of what
+  was and wasn't completed
+
+Explicitly OUT of scope for v3:
+- Writing status back into Google Calendar or Classroom (status lives
+  in the assistant's own persistent store, not synced back to Google)
+- Gmail/email in any form (v4/v5)
+- Weekly planning conversation UX (v6 — v6 depends on this but is a
+  separate feature)
 
 ### v4 — Email integration (read-only)
 Gmail read access, surfaced in check-ins/weekly planning. No sending.
