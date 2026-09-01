@@ -7,6 +7,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from calendar_tool import list_events, create_calendar_event, find_calendar_events, update_calendar_event
 from classroom_tool import list_classroom_assignments
+from storage import find_tasks, update_task_status
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -33,16 +34,22 @@ assistant_agent = Agent(
         "2. To resolve relative or custom timeframes (both past and future, such as 'yesterday', 'last week', 'today', 'this week', 'next Monday', 'September', etc.) for either Calendar or Classroom queries, "
         "you MUST first call `get_current_time` to check the current date and time. Use this information to calculate the necessary ISO timestamps for calendar event listings or to filter the dates of classroom assignments.\n"
         "3. Create Event: Convert the requested event time into an exact ISO format string (including the timezone offset) and call `create_calendar_event`.\n"
-        "4. Update/Edit Event: If the user asks you to edit, change, reschedule, or add descriptions/notes to an existing event, "
-        "you must first use `find_calendar_events` with a search query (e.g. the name of the event) to locate the event and get its ID. "
-        "Once you have the event ID, use `update_calendar_event` to apply the changes (such as adding/modifying the description, "
-        "changing the summary, or rescheduling the time). Always use the exact ISO time format for updates.\n\n"
+        "4. Update/Edit Event: If the user asks you to edit, change, reschedule, or add descriptions/notes to an existing event on Google Calendar, "
+        "you must first use `find_calendar_events` with a search query to locate the event and get its ID. "
+        "Once you have the event ID, use `update_calendar_event` to apply the changes. Always use the exact ISO time format for updates.\n\n"
         "Google Classroom Operations:\n"
         "1. You can fetch/list assignments (coursework) and their submission status (whether the user has turned them in or not) from Google Classroom using `list_classroom_assignments`.\n"
         "2. When answering queries about assignments or coursework, you must explicitly identify the items as coming 'from Classroom' rather than listing them bare or mixing them with Calendar events.\n\n"
+        "Task Execution & Status Tracking (Long-Term Memory):\n"
+        "1. When the user reports progress on a task or event (e.g. 'I finished my study session', 'I am working on the math assignment', 'completed dentist appointment'):\n"
+        "   - Call `find_tasks` with a keyword query to find the task in your local database.\n"
+        "   - If multiple candidates match, ask the user to clarify which one they mean.\n"
+        "   - If no candidate matches, inform the user you could not find the task in your records.\n"
+        "   - Once the candidate is matched, call `update_task_status` with `source_type`, `source_id`, and the new status ('NOT_STARTED', 'IN_PROGRESS', or 'DONE').\n"
+        "   - IMPORTANT: Updating task completion status is a local tracking operation in your database; NEVER edit or delete the event in Google Calendar when the user says they finished it.\n\n"
         "Always confirm back to the user with a friendly, concise message when you run operations."
     ),
-    tools=[get_current_time, list_events, create_calendar_event, find_calendar_events, update_calendar_event, list_classroom_assignments]
+    tools=[get_current_time, list_events, create_calendar_event, find_calendar_events, update_calendar_event, list_classroom_assignments, find_tasks, update_task_status]
 )
 
 # Initialize the Runner with InMemorySessionService

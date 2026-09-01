@@ -4,6 +4,7 @@ from datetime import datetime, time, timedelta
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from calendar_auth import SCOPES
+from storage import upsert_task
 
 def get_calendar_service():
     """Helper to authenticate and return the Google Calendar API service."""
@@ -62,6 +63,22 @@ def list_events(time_min_iso=None, time_max_iso=None):
     ).execute()
     
     events = events_result.get('items', [])
+    for event in events:
+        event_id = event.get('id')
+        summary = event.get('summary') or 'Untitled Event'
+        start = event.get('start', {}).get('dateTime') or event.get('start', {}).get('date')
+        if event_id:
+            try:
+                upsert_task(
+                    source_type="calendar",
+                    source_id=event_id,
+                    title=summary,
+                    status="NOT_STARTED",
+                    item_date=start
+                )
+            except Exception as e:
+                print(f"Warning: failed to sync calendar event '{summary}' to storage: {e}")
+
     return events
 
 def create_calendar_event(summary, start_time_iso, duration_minutes=60, description=None):
@@ -94,6 +111,20 @@ def create_calendar_event(summary, start_time_iso, duration_minutes=60, descript
     
     print(f"Creating event: {summary} on {start_dt.isoformat()} for {duration_minutes} mins...")
     event = service.events().insert(calendarId='primary', body=event_body).execute()
+    
+    # Upsert the newly created event into local storage
+    if event.get('id'):
+        try:
+            upsert_task(
+                source_type="calendar",
+                source_id=event['id'],
+                title=summary,
+                status="NOT_STARTED",
+                item_date=start_dt.isoformat()
+            )
+        except Exception as e:
+            print(f"Warning: failed to sync newly created event to storage: {e}")
+
     return event
 
 def find_calendar_events(query, time_min_iso=None, time_max_iso=None):
