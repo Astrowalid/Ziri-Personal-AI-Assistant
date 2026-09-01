@@ -3,6 +3,7 @@ import pickle
 from datetime import datetime, time, timezone
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
+from storage import upsert_task
 
 def get_classroom_service():
     """Helper to authenticate and return the Google Classroom API service."""
@@ -122,6 +123,18 @@ def list_classroom_assignments():
             
             due_date_str = due_dt.strftime('%Y-%m-%d %H:%M') if due_dt else 'No due date'
             
+            # Sync coursework into local SQLite storage
+            try:
+                upsert_task(
+                    source_type="classroom",
+                    source_id=cw_id,
+                    title=title,
+                    status="NOT_STARTED",
+                    item_date=due_dt.isoformat() if due_dt else None
+                )
+            except Exception as e:
+                print(f"Warning: failed to sync Classroom assignment '{title}' to storage: {e}")
+
             all_assignments.append({
                 'course_id': course_id,
                 'course_name': course_name,
