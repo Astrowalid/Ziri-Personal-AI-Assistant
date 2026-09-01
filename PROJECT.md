@@ -10,7 +10,7 @@ This project is unrelated to any other project (e.g. WhatsApp business tools).
 Do not reference or reuse patterns, personas, or pricing logic from other projects.
 
 ## Current status
-Shipped: v1, v2 (confirm actual v2 ship date with me). Building: v3.
+Shipped: v1, v2, v3. Building: v4.
 
 Update this section as versions ship. When a version ships:
 1. Write `docs/versions/vX.md` capturing what actually shipped (final scope,
@@ -104,11 +104,7 @@ Explicitly OUT of scope for v2:
 
 
 ### v3 — Long-term memory
-Persist planned-vs-done across days. Check-ins become "did you do X," not
-just "here's what's due." First real dependency on ADK's Session/Memory
-concepts — the point where it stops being a notifier and becomes an
-assistant with a track record.
-Done = it can accurately answer "what did I finish this week?"
+Shipped. See `docs/versions/v3.md` for full spec and details.
 
 ### v4 — Email integration (read-only)
 Gmail read access, surfaced in check-ins/weekly planning. No sending.
