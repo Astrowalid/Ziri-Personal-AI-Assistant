@@ -195,6 +195,84 @@ def get_completed_tasks(
         db_path=db_path
     )
 
+def reconcile_classroom_tasks(
+    classroom_assignments: List[Dict[str, Any]],
+    db_path: str = DB_PATH
+) -> List[Dict[str, Any]]:
+    """
+    Reconciles live Google Classroom assignments against local database records.
+    Implements Classroom-dominant reconciliation (Decision #3 in v3.md):
+    - If live Classroom shows submitted == True, updates local DB status to 'DONE' if not already 'DONE'.
+    - If local DB status is 'DONE', but live Classroom shows submitted == False (not-submitted),
+      flags a discrepancy warning dict for the user.
+      
+    Returns:
+        List of discrepancy warning dictionaries:
+        [
+            {
+                "source_id": str,
+                "title": str,
+                "course_name": str,
+                "local_status": "DONE",
+                "classroom_state": str,
+                "warning_message": str
+            },
+            ...
+        ]
+    """
+    discrepancies: List[Dict[str, Any]] = []
+    
+    for assign in classroom_assignments:
+        cw_id = assign.get("assignment_id")
+        title = assign.get("title", "Untitled Assignment")
+        course_name = assign.get("course_name", "Unknown Course")
+        is_submitted = assign.get("submitted", False)
+        classroom_state = assign.get("state", "NEW")
+        
+        if not cw_id:
+            continue
+            
+        task = get_task(source_type="classroom", source_id=cw_id, db_path=db_path)
+        
+        if task:
+            local_status = task.get("status")
+            
+            # Case 1: Discrepancy - Marked DONE locally, but not submitted in Classroom
+            if local_status == "DONE" and not is_submitted:
+                warning_msg = (
+                    f"⚠️ Discrepancy: '{title}' ({course_name}) is marked DONE in your records, "
+                    f"but Google Classroom shows it is not yet submitted (State: {classroom_state})."
+                )
+                discrepancies.append({
+                    "source_id": cw_id,
+                    "title": title,
+                    "course_name": course_name,
+                    "local_status": local_status,
+                    "classroom_state": classroom_state,
+                    "warning_message": warning_msg
+                })
+            # Case 2: Submitted in Classroom, but local status was not yet updated to DONE
+            elif is_submitted and local_status != "DONE":
+                update_task_status(
+                    source_type="classroom",
+                    source_id=cw_id,
+                    new_status="DONE",
+                    db_path=db_path
+                )
+        else:
+            # If not yet in DB, upsert with appropriate status
+            initial_status = "DONE" if is_submitted else "NOT_STARTED"
+            upsert_task(
+                source_type="classroom",
+                source_id=cw_id,
+                title=title,
+                status=initial_status,
+                item_date=assign.get("due_date_utc"),
+                db_path=db_path
+            )
+            
+    return discrepancies
+
 if __name__ == "__main__":
     import tempfile
     import shutil
