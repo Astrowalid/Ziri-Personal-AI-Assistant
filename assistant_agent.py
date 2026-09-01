@@ -7,7 +7,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from calendar_tool import list_events, create_calendar_event, find_calendar_events, update_calendar_event
 from classroom_tool import list_classroom_assignments
-from storage import find_tasks, update_task_status
+from storage import find_tasks, update_task_status, get_completed_tasks, get_tasks_for_date_range
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -46,10 +46,26 @@ assistant_agent = Agent(
         "   - If multiple candidates match, ask the user to clarify which one they mean.\n"
         "   - If no candidate matches, inform the user you could not find the task in your records.\n"
         "   - Once the candidate is matched, call `update_task_status` with `source_type`, `source_id`, and the new status ('NOT_STARTED', 'IN_PROGRESS', or 'DONE').\n"
-        "   - IMPORTANT: Updating task completion status is a local tracking operation in your database; NEVER edit or delete the event in Google Calendar when the user says they finished it.\n\n"
+        "   - IMPORTANT: Updating task completion status is a local tracking operation in your database; NEVER edit or delete the event in Google Calendar when the user says they finished it.\n"
+        "2. When the user asks about historical completion (e.g. 'what did I finish this week?', 'what did I complete yesterday?', 'show finished tasks'):\n"
+        "   - First call `get_current_time` to determine the date range.\n"
+        "   - Call `get_completed_tasks` with the ISO `start_date` and `end_date` strings to query completed tasks directly from your local SQLite database.\n"
+        "   - Summarize the completed tasks clearly with their titles and sources (Calendar / Classroom).\n"
+        "   - Do NOT call Google Calendar or Google Classroom APIs for historical completion queries.\n\n"
         "Always confirm back to the user with a friendly, concise message when you run operations."
     ),
-    tools=[get_current_time, list_events, create_calendar_event, find_calendar_events, update_calendar_event, list_classroom_assignments, find_tasks, update_task_status]
+    tools=[
+        get_current_time,
+        list_events,
+        create_calendar_event,
+        find_calendar_events,
+        update_calendar_event,
+        list_classroom_assignments,
+        find_tasks,
+        update_task_status,
+        get_completed_tasks,
+        get_tasks_for_date_range
+    ]
 )
 
 # Initialize the Runner with InMemorySessionService
