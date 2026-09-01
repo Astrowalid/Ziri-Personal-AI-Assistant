@@ -27,3 +27,7 @@ Thumbs.db
 
 token.pickle
 token_classroom.pickle
+
+# Database
+assistant.db
+*.db
