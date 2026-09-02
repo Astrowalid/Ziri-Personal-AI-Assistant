@@ -19,12 +19,6 @@ Update this section as versions ship. When a version ships:
    with a one-line pointer, e.g. `v1 — shipped 2026-08-20. See docs/versions/v1.md`.
 3. Update this section.
 
-### Security hardening (Post-v2)
-Post-v2 hardening: `bot.py` and `daily_checkin.py` now verify incoming Telegram chat_id against `TELEGRAM_ALLOWED_CHAT_ID` (from `.env`) before processing any message — unauthorized senders are silently ignored. `chat_id.txt` removed.
-
-Also flagged, not yet fixed:
-- OAuth tokens stored as plaintext pickle files (should move to JSON).
-- PII (event/assignment details) logged to stdout.
 
 ## Boundaries
 
@@ -70,8 +64,12 @@ Also flagged, not yet fixed:
   - Scheduler: `python scheduler.py`
 - Run tests / verify components:
   - Verify Calendar tools: `python calendar_tool.py`
+  - Verify Classroom tools: `python classroom_tool.py`
+  - Verify SQLite storage: `python storage.py`
   - Verify Agent logic: `python assistant_agent.py`
-- Trigger a check-in manually: `python daily_checkin.py`
+- Trigger check-ins manually:
+  - Morning check-in: `python daily_checkin.py` (or `/checkin` in Telegram)
+  - Evening follow-up: `python night_checkin.py` (or `/nightcheckin` / `/followup` in Telegram)
 
 ## Version roadmap
 
@@ -104,7 +102,7 @@ Explicitly OUT of scope for v2:
 
 
 ### v3 — Long-term memory
-Shipped. See `docs/versions/v3.md` for full spec and details.
+Shipped. Introduced SQLite persistence for planned-vs-done task tracking, historical queries ("what did I finish this week?"), context-aware morning check-ins, evening accountability check-ins ("suivi"), in-memory caching and parallel Classroom fetching, interactive bot commands (`/checkin`, `/nightcheckin`), and auto-registration of events. See `docs/versions/v3.md` for full spec and details.
 
 ### v4 — Email integration (read-only)
 Gmail read access, surfaced in check-ins/weekly planning. No sending.
