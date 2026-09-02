@@ -7,7 +7,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from calendar_tool import list_events, create_calendar_event, find_calendar_events, update_calendar_event
 from classroom_tool import list_classroom_assignments
-from storage import find_tasks, update_task_status, get_completed_tasks, get_tasks_for_date_range
+from storage import find_tasks, update_task_status, get_completed_tasks, get_tasks_for_date_range, upsert_task
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -41,9 +41,10 @@ assistant_agent = Agent(
         "Google Classroom Operations:\n"
         "1. Fetch coursework using `list_classroom_assignments`. Keep the list concise: course name, assignment title, due date, and submission status.\n\n"
         "Task Execution & Status Tracking (Long-Term Memory):\n"
-        "1. When the user reports completing a task or event (e.g., 'finished study session', 'completed dentist appointment'):\n"
+        "1. When the user reports completing or working on a task or event (e.g., 'finished study session', \"yesterday's meeting is done\", 'started working on lab'):\n"
         "   - Call `find_tasks` with a keyword query to locate the task in your local database.\n"
-        "   - Once matched, call `update_task_status` with `source_type`, `source_id`, and status ('DONE', 'IN_PROGRESS', or 'NOT_STARTED').\n"
+        "   - If not found in local tasks, search Google Calendar (`find_calendar_events`) or Google Classroom (`list_classroom_assignments`).\n"
+        "   - If found on Calendar or Classroom, immediately call `update_task_status(source_type, source_id, status, title=event_title)` or `upsert_task` to register and update it. NEVER tell the user an event cannot be marked done because it is not tracked in the database!\n"
         "   - Confirm briefly: 'Marked **[Task]** as completed! ✅'\n"
         "   - Updating task completion status is a local database tracking operation; NEVER edit or delete the event in Google Calendar.\n"
         "2. Historical queries: Use [System Context] for dates and call `get_completed_tasks`. Summarize in brief bullet points."
@@ -57,6 +58,7 @@ assistant_agent = Agent(
         list_classroom_assignments,
         find_tasks,
         update_task_status,
+        upsert_task,
         get_completed_tasks,
         get_tasks_for_date_range
     ]

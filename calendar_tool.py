@@ -168,7 +168,24 @@ def find_calendar_events(query, time_min_iso=None, time_max_iso=None):
         singleEvents=True
     ).execute()
     
-    return events_result.get('items', [])
+    events = events_result.get('items', [])
+    for event in events:
+        event_id = event.get('id')
+        summary = event.get('summary') or 'Untitled Event'
+        start = event.get('start', {}).get('dateTime') or event.get('start', {}).get('date')
+        if event_id:
+            try:
+                upsert_task(
+                    source_type="calendar",
+                    source_id=event_id,
+                    title=summary,
+                    status="NOT_STARTED",
+                    item_date=start
+                )
+            except Exception as e:
+                print(f"Warning: failed to sync found calendar event '{summary}' to storage: {e}")
+
+    return events
 
 def update_calendar_event(event_id, summary=None, start_time_iso=None, duration_minutes=None, description=None):
     """Updates an existing event on the primary calendar.

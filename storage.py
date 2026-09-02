@@ -97,9 +97,20 @@ def update_task_status(
     source_type: str,
     source_id: str,
     new_status: str,
+    title: Optional[str] = None,
+    item_date: Optional[str] = None,
     db_path: str = DB_PATH
 ) -> bool:
-    """Updates the status and updated_at timestamp of a task."""
+    """Updates the status and updated_at timestamp of a task.
+    If the task does not exist in local storage yet and title is provided, it will be automatically registered with the given status.
+    
+    Args:
+        source_type: The source ('calendar' or 'classroom').
+        source_id: The verbatim Google event_id or courseWork_id.
+        new_status: New status ('NOT_STARTED', 'IN_PROGRESS', or 'DONE').
+        title: Optional title of the event/task (used to auto-register if not yet tracked).
+        item_date: Optional date/time string of the event/task.
+    """
     if new_status not in VALID_STATUSES:
         raise ValueError(f"Invalid status: {new_status}. Must be one of {VALID_STATUSES}")
     
@@ -113,7 +124,20 @@ def update_task_status(
             WHERE source_type = ? AND source_id = ?
         """, (new_status, now_iso, source_type, source_id))
         conn.commit()
-        return cursor.rowcount > 0
+        if cursor.rowcount > 0:
+            return True
+            
+        # If not found but title is provided, auto-register it immediately
+        if title:
+            cursor.execute("""
+                INSERT INTO task_status (
+                    source_type, source_id, title, status, item_date, last_synced_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (source_type, source_id, title, new_status, item_date, now_iso, now_iso))
+            conn.commit()
+            return True
+
+        return False
 
 def find_tasks(
     query: str,
