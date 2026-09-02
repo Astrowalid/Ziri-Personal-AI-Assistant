@@ -17,9 +17,12 @@ def get_calendar_service():
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             print("Refreshing expired Google Calendar credentials...")
-            creds.refresh(Request())
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(creds, token)
+            try:
+                creds.refresh(Request())
+                with open('token.pickle', 'wb') as token:
+                    pickle.dump(creds, token)
+            except Exception as e:
+                raise Exception(f"Google Calendar token refresh failed ({e}). Please run calendar_auth.py to re-authenticate.")
         else:
             raise Exception("Credentials not found or invalid. Please run calendar_auth.py first.")
             

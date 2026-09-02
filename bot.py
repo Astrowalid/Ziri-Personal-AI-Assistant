@@ -9,6 +9,8 @@ if hasattr(sys.stderr, 'reconfigure'):
 
 import dotenv
 from telegram import Update
+from telegram.error import TimedOut, NetworkError
+from telegram.request import HTTPXRequest
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 from assistant_agent import run_agent_turn
 
@@ -51,8 +53,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     user_id = str(update.effective_user.id)
     
-    # Show typing status to let the user know the bot is thinking
-    await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    # Show typing status (safely ignore if it times out)
+    try:
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+    except Exception as e:
+        print(f"Warning: Failed to send typing indicator: {e}")
     
     # Run the agent turn (using to_thread because run_agent_turn is blocking/sync)
     response_text = await asyncio.to_thread(
@@ -66,13 +71,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not response_text.strip():
         response_text = "I'm sorry, I encountered an issue processing that request."
         
-    # Send the response back to the user
-    await update.message.reply_text(response_text)
+    # Send the response back to the user with retry on transient network timeouts
+    for attempt in range(1, 4):
+        try:
+            await update.message.reply_text(response_text)
+            break
+        except (TimedOut, NetworkError) as e:
+            print(f"Network timeout sending reply (attempt {attempt}/3): {e}")
+            if attempt < 3:
+                await asyncio.sleep(2)
+            else:
+                print("Failed to deliver message after 3 attempts.")
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log errors caused by updates."""
+    print(f"Telegram error encountered: {context.error}")
 
 def main() -> None:
-    """Start the Telegram bot."""
+    """Start the Telegram bot with increased HTTP timeouts."""
     print("Starting Telegram bot...")
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    
+    # Configure longer HTTP connection and read timeouts to prevent ConnectTimeout drops
+    request_config = HTTPXRequest(
+        connect_timeout=30.0,
+        read_timeout=30.0,
+        write_timeout=30.0,
+        pool_timeout=30.0
+    )
+    
+    app = (
+        ApplicationBuilder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .request(request_config)
+        .build()
+    )
+    
+    # Register error handler
+    app.add_error_handler(error_handler)
     
     # Register handlers
     app.add_handler(CommandHandler("start", start))

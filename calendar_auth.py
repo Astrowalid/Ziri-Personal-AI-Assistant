@@ -2,6 +2,7 @@ import os
 import pickle
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -17,10 +18,16 @@ def authenticate_google_calendar():
             
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
+        refreshed = False
         if creds and creds.expired and creds.refresh_token:
             print("Refreshing expired credentials...")
-            creds.refresh(Request())
-        else:
+            try:
+                creds.refresh(Request())
+                refreshed = True
+            except RefreshError as e:
+                print(f"Failed to refresh token ({e}). Starting re-authentication...")
+                
+        if not refreshed:
             print("No valid credentials found. Starting authentication flow...")
             flow = InstalledAppFlow.from_client_secrets_file(
                 'client-calendar-id.json', SCOPES)
