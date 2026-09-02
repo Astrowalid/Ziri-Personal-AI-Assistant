@@ -21,12 +21,13 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN is missing in the environment or .env file.")
 
-async def main() -> None:
-    # 1. Retrieve the allowed chat ID from environment variables
-    chat_id = os.getenv("TELEGRAM_ALLOWED_CHAT_ID")
+async def perform_daily_checkin(bot: Bot = None, chat_id: str = None) -> None:
+    # 1. Retrieve the allowed chat ID from environment variables if not provided
+    if not chat_id:
+        chat_id = os.getenv("TELEGRAM_ALLOWED_CHAT_ID")
     if not chat_id:
         print("Error: TELEGRAM_ALLOWED_CHAT_ID is missing in the environment or .env file.")
-        sys.exit(1)
+        return
         
     print(f"Triggering daily check-in for Chat ID: {chat_id}...")
     
@@ -94,10 +95,20 @@ async def main() -> None:
         checkin_text = "Good morning! Here is a quick check-in. I couldn't retrieve your schedule today."
         
     # 5. Send the message via Telegram Bot
-    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    if bot is None:
+        bot = Bot(token=TELEGRAM_BOT_TOKEN)
+        
     print("Sending check-in message to Telegram...")
-    await bot.send_message(chat_id=chat_id, text=checkin_text)
+    # Telegram message limit is 4096 characters; chunk if needed
+    if len(checkin_text) > 4000:
+        for i in range(0, len(checkin_text), 4000):
+            await bot.send_message(chat_id=chat_id, text=checkin_text[i:i+4000])
+    else:
+        await bot.send_message(chat_id=chat_id, text=checkin_text)
     print("Daily check-in sent successfully!")
+
+async def main() -> None:
+    await perform_daily_checkin()
 
 if __name__ == '__main__':
     asyncio.run(main())

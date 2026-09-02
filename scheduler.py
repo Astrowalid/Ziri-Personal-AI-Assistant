@@ -2,9 +2,13 @@ import time
 import datetime
 import subprocess
 import sys
+import os
+from dotenv import load_dotenv
 
-# Fixed time to run the daily check-in (24-hour format local time)
-CHECKIN_TIME_STR = "18:46"
+load_dotenv()
+CHECKIN_TIME_STR = os.getenv("CHECKIN_TIME")
+if not CHECKIN_TIME_STR:
+    raise ValueError("CHECKIN_TIME must be set in the .env file")
 
 def run_checkin() -> None:
     """Runs daily_checkin.py script using the same Python interpreter."""
