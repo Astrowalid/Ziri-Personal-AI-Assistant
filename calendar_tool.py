@@ -28,13 +28,26 @@ def get_calendar_service():
             
     return build('calendar', 'v3', credentials=creds)
 
-def list_events(time_min_iso=None, time_max_iso=None):
+import time as time_module
+
+_CALENDAR_CACHE = {}
+CALENDAR_CACHE_TTL = 60  # 60 seconds
+
+def list_events(time_min_iso=None, time_max_iso=None, force_refresh=False):
     """Lists events on the primary calendar for a given timeframe.
     
     Args:
         time_min_iso (str, optional): Start of the time range in ISO 8601 format. Defaults to the start of today.
         time_max_iso (str, optional): End of the time range in ISO 8601 format. Defaults to the end of today.
+        force_refresh (bool, optional): If True, bypasses the in-memory cache.
     """
+    cache_key = (time_min_iso, time_max_iso)
+    now_ts = time_module.time()
+    if not force_refresh and cache_key in _CALENDAR_CACHE:
+        cached_ts, cached_events = _CALENDAR_CACHE[cache_key]
+        if now_ts - cached_ts < CALENDAR_CACHE_TTL:
+            return cached_events
+
     service = get_calendar_service()
     
     # Get local timezone
@@ -82,6 +95,7 @@ def list_events(time_min_iso=None, time_max_iso=None):
             except Exception as e:
                 print(f"Warning: failed to sync calendar event '{summary}' to storage: {e}")
 
+    _CALENDAR_CACHE[cache_key] = (now_ts, events)
     return events
 
 def create_calendar_event(summary, start_time_iso, duration_minutes=60, description=None):
@@ -127,6 +141,9 @@ def create_calendar_event(summary, start_time_iso, duration_minutes=60, descript
             )
         except Exception as e:
             print(f"Warning: failed to sync newly created event to storage: {e}")
+
+    # Invalidate list cache so newly created event is immediately visible
+    _CALENDAR_CACHE.clear()
 
     return event
 
@@ -210,6 +227,9 @@ def update_calendar_event(event_id, summary=None, start_time_iso=None, duration_
         eventId=event_id,
         body=event
     ).execute()
+    
+    # Invalidate list cache so updated event is immediately visible
+    _CALENDAR_CACHE.clear()
     
     return updated_event
 

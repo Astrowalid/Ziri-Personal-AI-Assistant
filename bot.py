@@ -7,6 +7,8 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
+import random
+from typing import Optional
 from datetime import datetime, timedelta
 import dotenv
 from telegram import Update
@@ -41,15 +43,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     welcome_text = (
         f"Hi {update.effective_user.first_name}! I am Ziri, your Personal Assistant Agent.\n\n"
-        "I have access to your Google Calendar and Google Classroom. You can ask me:\n"
-        "• 'What do I have scheduled for today?'\n"
-        "• 'Add dentist at 3pm tomorrow'\n"
-        "• 'What assignments do I have for my ML class?'\n"
-        "• /checkin to get your morning briefing on demand\n"
-        "• /nightcheckin (or /followup) to trigger your evening follow-up accountability check\n\n"
+        "I have access to your Google Calendar and Google Classroom.\n"
         "How can I help you today?"
     )
     await update.message.reply_text(welcome_text)
+
+async def keep_typing(bot, chat_id: str, stop_event: asyncio.Event) -> None:
+    """Continuously sends 'typing' chat action every 4 seconds until stop_event is set."""
+    while not stop_event.is_set():
+        try:
+            await bot.send_chat_action(chat_id=chat_id, action="typing")
+        except Exception:
+            pass
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=4.0)
+        except asyncio.TimeoutError:
+            pass
 
 async def checkin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Allows manual on-demand trigger of the daily check-in briefing."""
@@ -58,11 +67,16 @@ async def checkin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     
     await update.message.reply_text("⏳ Generating your daily check-in...")
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(context.bot, chat_id, stop_typing))
     try:
         await perform_daily_checkin(bot=context.bot, chat_id=chat_id)
     except Exception as e:
         print(f"Error during manual /checkin: {e}")
         await update.message.reply_text(f"❌ Error generating check-in: {e}")
+    finally:
+        stop_typing.set()
+        await typing_task
 
 async def night_checkin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Allows manual on-demand trigger of the evening follow-up."""
@@ -71,11 +85,87 @@ async def night_checkin_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
     
     await update.message.reply_text("🌙 Preparing your evening follow-up...")
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(context.bot, chat_id, stop_typing))
     try:
         await perform_night_checkin(bot=context.bot, chat_id=chat_id)
     except Exception as e:
         print(f"Error during manual /nightcheckin: {e}")
         await update.message.reply_text(f"❌ Error generating evening follow-up: {e}")
+    finally:
+        stop_typing.set()
+        await typing_task
+
+CALENDAR_WAIT_PHRASES = [
+    "Let me check your calendar for you... 📅",
+    "Checking your schedule, give me a sec! ⏳",
+    "Looking at your calendar right now... 🔍",
+    "Pulling up your schedule, one moment! ⏱️",
+    "Let me see what you have on your calendar... 🗓️",
+    "Just a sec, checking your calendar! ⏳",
+]
+
+CLASSROOM_WAIT_PHRASES = [
+    "I'm gonna check that for you on Classroom... 📚",
+    "Checking your assignments on Classroom, one sec! ⏳",
+    "Looking up your coursework right now... 🔍",
+    "Pulling up your Classroom tasks, hang tight! ⏱️",
+    "Let me check Google Classroom for you... 📝",
+    "Just a sec, checking what's due on Classroom! ⏳",
+]
+
+BOTH_WAIT_PHRASES = [
+    "Let me check both your calendar and Classroom for you... 🔍",
+    "Checking your schedule and assignments, give me a sec! ⏳",
+    "Looking into your calendar and coursework, one moment! ⏱️",
+]
+
+def get_wait_notice_phrase(message: str) -> Optional[str]:
+    """Returns a randomized contextual phrase only if checking Calendar or Classroom; otherwise None."""
+    msg = message.lower()
+    
+    # Check for Classroom-related check queries
+    classroom_keywords = [
+        "classroom", "assignment", "assignments", "homework", "course", 
+        "courses", "coursework", "devoir", "tp", "td", "due", 
+        "submission", "submitted", "turn in", "turned in"
+    ]
+    is_classroom = any(kw in msg for kw in classroom_keywords)
+    
+    # Check for Calendar/schedule check queries
+    calendar_keywords = [
+        "calendar", "schedule", "scheduled", "event", "events", 
+        "meeting", "meetings", "agenda", "appointment", "appointments", 
+        "free", "busy"
+    ]
+    time_queries = ["today", "tomorrow", "this week", "next week", "planned", "plan"]
+    is_calendar = any(kw in msg for kw in calendar_keywords) or (
+        any(t in msg for t in time_queries) and any(q in msg for q in ["what", "have", "do i have", "show", "check", "see", "any"])
+    )
+    
+    if is_classroom and is_calendar:
+        return random.choice(BOTH_WAIT_PHRASES)
+    elif is_classroom:
+        return random.choice(CLASSROOM_WAIT_PHRASES)
+    elif is_calendar:
+        return random.choice(CALENDAR_WAIT_PHRASES)
+        
+    return None
+
+async def delayed_wait_notice(update: Update, user_message: str, stop_event: asyncio.Event, delay: float = 2.0) -> None:
+    """Sends a contextual acknowledgement if processing takes longer than delay seconds and query checks calendar/classroom."""
+    phrase = get_wait_notice_phrase(user_message)
+    if not phrase:
+        return
+
+    try:
+        await asyncio.wait_for(stop_event.wait(), timeout=delay)
+    except asyncio.TimeoutError:
+        if not stop_event.is_set() and update.message:
+            try:
+                await update.message.reply_text(phrase)
+            except Exception as e:
+                print(f"Notice delivery warning: {e}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Pass user messages to the ADK agent and reply with the agent's response."""
@@ -89,19 +179,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
     user_id = str(update.effective_user.id)
     
-    # Show typing status (safely ignore if it times out)
-    try:
-        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
-    except Exception as e:
-        print(f"Warning: Failed to send typing indicator: {e}")
+    # Maintain continuous typing status and schedule wait notice if turn takes > 2.0s
+    stop_processing = asyncio.Event()
+    typing_task = asyncio.create_task(keep_typing(context.bot, chat_id, stop_processing))
+    notice_task = asyncio.create_task(delayed_wait_notice(update, user_message, stop_processing, delay=2.0))
     
-    # Run the agent turn (using to_thread because run_agent_turn is blocking/sync)
-    response_text = await asyncio.to_thread(
-        run_agent_turn,
-        user_message=user_message,
-        session_id=chat_id,
-        user_id=user_id
-    )
+    try:
+        # Run the agent turn (using to_thread because run_agent_turn is blocking/sync)
+        response_text = await asyncio.to_thread(
+            run_agent_turn,
+            user_message=user_message,
+            session_id=chat_id,
+            user_id=user_id
+        )
+    finally:
+        stop_processing.set()
+        await typing_task
+        await notice_task
     
     # If the response is empty for some reason, provide a fallback
     if not response_text.strip():
