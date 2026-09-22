@@ -30,4 +30,6 @@ token_classroom.pickle
 
 # Database
 assistant.db
-*.db
+*.db
+
+docs/architecture/

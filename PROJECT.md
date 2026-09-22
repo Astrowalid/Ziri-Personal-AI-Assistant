@@ -10,7 +10,7 @@ This project is unrelated to any other project (e.g. WhatsApp business tools).
 Do not reference or reuse patterns, personas, or pricing logic from other projects.
 
 ## Current status
-Shipped: v1, v2, v3. Building: v4.
+Shipped: v1, v2, v3. Building: v4 (Weekly Sunday Planning).
 
 Update this section as versions ship. When a version ships:
 1. Write `docs/versions/vX.md` capturing what actually shipped (final scope,
@@ -39,10 +39,10 @@ Update this section as versions ship. When a version ships:
   (see roadmap) — flag it instead: "this is a vX feature, want me to note it
   for later?"
 - Send an email or any external communication without an approval gate
-  (not relevant until v5, but never build a bypass earlier)
+  (deferred to post-deployment versions, never build a bypass)
 - Reference or reuse patterns, personas, or pricing logic from other
   projects (e.g. the WhatsApp business project) — unrelated, keep separate
-- Add production/always-on hosting infra before v7
+- Add production/always-on hosting infra before v5
 
 ## Ground rules (read before writing any code)
 1. Build in version order. Do not implement a feature from a later version
@@ -104,27 +104,30 @@ Explicitly OUT of scope for v2:
 ### v3 — Long-term memory
 Shipped. Introduced SQLite persistence for planned-vs-done task tracking, historical queries ("what did I finish this week?"), context-aware morning check-ins, evening accountability check-ins ("suivi"), in-memory caching and parallel Classroom fetching, interactive bot commands (`/checkin`, `/nightcheckin`), and auto-registration of events. See `docs/versions/v3.md` for full spec and details.
 
-### v4 — Email integration (read-only)
-Gmail read access, surfaced in check-ins/weekly planning. No sending.
-Done = it flags "prof replied" without user opening Gmail.
-
-### v5 — Email drafting with approval gate
-Agent drafts replies, sends draft via Telegram, user approves/edits before
-anything sends. Deliberately last of the core features — approval UX is
-the trickiest to get right.
-Done = zero emails sent without explicit yes.
-
-### v6 — Weekly Sunday planning conversation
+### v4 — Weekly Sunday planning conversation
 Pulls from Calendar + Classroom + v3's execution memory. Ranks upcoming
 items by importance, helps block time. Only makes sense once v3 memory
 exists.
 Done = one real Sunday session that produces a week the user actually
 sticks to.
 
-### v7 — Always-on deployment
+### v5 — Always-on deployment
 Move off "runs when I run the script" to persistent hosting (always-on VM +
-cron, or a managed agent runtime). Production-grade polish pass, not the
-first time anything runs unattended (v1 already needs *some* scheduler).
+cron, or a managed agent runtime). Production-grade polish pass, getting
+the core assistant live 24/7.
+Done = the bot and its schedulers run unattended on remote hosting without manual script runs.
+
+--- Post-Deployment Updates (Future) ---
+
+### v6 — Email integration (read-only)
+Gmail read access, surfaced in check-ins/weekly planning. No sending.
+Done = it flags "prof replied" without user opening Gmail.
+
+### v7 — Email drafting with approval gate
+Agent drafts replies, sends draft via Telegram, user approves/edits before
+anything sends. Deliberately last of the core features — approval UX is
+the trickiest to get right.
+Done = zero emails sent without explicit yes.
 
 ## Architecture (v1)
 
