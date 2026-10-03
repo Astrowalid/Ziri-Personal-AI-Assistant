@@ -1,6 +1,7 @@
 import os
 import pickle
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timezone, timedelta
+from typing import List, Dict, Any, Optional
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from storage import upsert_task
@@ -167,6 +168,55 @@ def list_classroom_assignments(force_refresh=False):
     _CLASSROOM_CACHE["timestamp"] = now_ts
     _CLASSROOM_CACHE["data"] = all_assignments
     return all_assignments
+
+def get_upcoming_assignments(
+    days: int = 7,
+    include_submitted: bool = False,
+    force_refresh: bool = False
+) -> List[Dict[str, Any]]:
+    """Fetches assignments due within the next `days` days from Google Classroom.
+    
+    Args:
+        days: Number of days into the future to look (default 7).
+        include_submitted: If False, excludes already submitted/returned assignments.
+        force_refresh: If True, bypasses the in-memory cache.
+        
+    Returns:
+        List of assignment dicts, filtered and sorted chronologically by due date
+        (assignments with due dates first, then assignments with no due date).
+    """
+    assignments = list_classroom_assignments(force_refresh=force_refresh)
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(days=days)
+    
+    upcoming: List[Dict[str, Any]] = []
+    for assign in assignments:
+        is_submitted = assign.get('submitted', False)
+        if not include_submitted and is_submitted:
+            continue
+            
+        due_val = assign.get('due_date_utc')
+        if due_val:
+            try:
+                if isinstance(due_val, datetime):
+                    due_dt = due_val
+                else:
+                    due_str = str(due_val).replace('Z', '+00:00')
+                    due_dt = datetime.fromisoformat(due_str)
+                if due_dt.tzinfo is None:
+                    due_dt = due_dt.replace(tzinfo=timezone.utc)
+                if now <= due_dt <= cutoff:
+                    upcoming.append(assign)
+            except (ValueError, TypeError):
+                continue
+        else:
+            # Include assignments with no due date if unsubmitted, or if include_submitted is requested
+            if not is_submitted or include_submitted:
+                upcoming.append(assign)
+                
+    # Sort chronologically by due date (items with due date first, then items with no due date)
+    upcoming.sort(key=lambda x: (x.get('due_date_utc') is None, str(x.get('due_date_utc') or '')))
+    return upcoming
 
 if __name__ == '__main__':
     print("Testing Google Classroom API client...")

@@ -1,7 +1,7 @@
 import sqlite3
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, time
 from contextlib import contextmanager
 from typing import Optional, List, Dict, Any, Generator
 
@@ -516,6 +516,63 @@ def get_matrix_summary(
             summary["UNASSIGNED"].append(task)
     return summary
 
+def get_carryover_tasks(
+    before_date_iso: Optional[str] = None,
+    days_back: int = 14,
+    db_path: str = DB_PATH
+) -> List[Dict[str, Any]]:
+    """Queries unfinished tasks scheduled before before_date_iso within a lookback window.
+    
+    Filters tasks where status IN ('NOT_STARTED', 'IN_PROGRESS') and item_date is before
+    before_date_iso (defaults to start of today in local timezone), within days_back days.
+    
+    Args:
+        before_date_iso (str, optional): Upper bound ISO date or datetime string (exclusive).
+                                         Defaults to start of today (00:00:00) in local timezone.
+        days_back (int, optional): Number of days back from before_date to query (default 14).
+        db_path (str, optional): Path to SQLite database file.
+        
+    Returns:
+        List[Dict[str, Any]]: List of carried-over unfinished task dictionaries,
+                              ordered chronologically by item_date ASC, updated_at DESC.
+    """
+    local_tz = datetime.now().astimezone().tzinfo
+    if not before_date_iso:
+        now = datetime.now(local_tz)
+        before_dt = datetime.combine(now.date(), time.min).replace(tzinfo=local_tz)
+        before_bound = before_dt.isoformat()
+    else:
+        try:
+            before_dt = datetime.fromisoformat(before_date_iso)
+        except ValueError:
+            before_dt = datetime.strptime(before_date_iso[:10], "%Y-%m-%d")
+        if before_dt.tzinfo is None:
+            before_dt = before_dt.replace(tzinfo=local_tz)
+        before_bound = before_date_iso
+
+    cutoff_dt = before_dt - timedelta(days=days_back)
+    cutoff_bound = cutoff_dt.isoformat()
+
+    # Normalise bounds so string comparison in SQLite matches whether item_date has 'T' or not
+    before_norm = before_bound if "T" in before_bound else f"{before_bound}T00:00:00"
+    cutoff_norm = cutoff_bound if "T" in cutoff_bound else f"{cutoff_bound}T00:00:00"
+
+    sql = """
+        SELECT * FROM task_status
+        WHERE status IN ('NOT_STARTED', 'IN_PROGRESS')
+          AND item_date IS NOT NULL
+          AND (CASE WHEN instr(item_date, 'T') > 0 THEN item_date ELSE item_date || 'T00:00:00' END) < ?
+          AND (CASE WHEN instr(item_date, 'T') > 0 THEN item_date ELSE item_date || 'T00:00:00' END) >= ?
+        ORDER BY item_date ASC, updated_at DESC
+    """
+    params = [before_norm, cutoff_norm]
+
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
 def reconcile_classroom_tasks(
     classroom_assignments: List[Dict[str, Any]],
     db_path: str = DB_PATH
@@ -801,6 +858,33 @@ if __name__ == "__main__":
         assert completed[0]["source_id"] == "q3_task"
         print("   [PASS] Existing search and completion functions working properly.")
 
-        print("\nALL PHASE 1 STORAGE VERIFICATION TESTS PASSED SUCCESSFULLY.")
+        # --- TEST GROUP 6: Carryover Tasks (Phase 2) ---
+        print("\n6. Testing get_carryover_tasks...")
+        # Populate tasks for carryover test
+        # Base date: 2026-09-04T00:00:00
+        # Carryover candidate 1: 2026-09-02 NOT_STARTED (within 14 days, before base date) -> should be included
+        # Carryover candidate 2: 2026-09-03 IN_PROGRESS (within 14 days, before base date) -> should be included
+        # Completed task: 2026-09-02 DONE -> should be excluded
+        # Skipped task: 2026-09-02 SKIPPED -> should be excluded
+        # Future task: 2026-09-05 NOT_STARTED -> should be excluded
+        # Too old task: 2026-08-15 NOT_STARTED (> 14 days ago) -> should be excluded
+        upsert_task("calendar", "carry_1", "Carryover 1", "NOT_STARTED", "2026-09-02T10:00:00", db_path=test_db)
+        upsert_task("calendar", "carry_2", "Carryover 2", "IN_PROGRESS", "2026-09-03T15:00:00", db_path=test_db)
+        upsert_task("calendar", "carry_done", "Carryover Done", "DONE", "2026-09-02T12:00:00", db_path=test_db)
+        upsert_task("calendar", "carry_skip", "Carryover Skipped", "SKIPPED", "2026-09-02T13:00:00", db_path=test_db)
+        upsert_task("calendar", "future_task", "Future Task", "NOT_STARTED", "2026-09-05T10:00:00", db_path=test_db)
+        upsert_task("calendar", "old_task", "Too Old Task", "NOT_STARTED", "2026-08-15T10:00:00", db_path=test_db)
+
+        carryovers = get_carryover_tasks(before_date_iso="2026-09-04T00:00:00", days_back=14, db_path=test_db)
+        carry_ids = [t["source_id"] for t in carryovers]
+        assert "carry_1" in carry_ids, "carry_1 should be in carryovers"
+        assert "carry_2" in carry_ids, "carry_2 should be in carryovers"
+        assert "carry_done" not in carry_ids, "DONE task should NOT be in carryovers"
+        assert "carry_skip" not in carry_ids, "SKIPPED task should NOT be in carryovers"
+        assert "future_task" not in carry_ids, "Future task should NOT be in carryovers"
+        assert "old_task" not in carry_ids, "Task older than days_back should NOT be in carryovers"
+        print("   [PASS] get_carryover_tasks verified with status, future, and age bounds.")
+
+        print("\nALL STORAGE VERIFICATION TESTS PASSED SUCCESSFULLY.")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
